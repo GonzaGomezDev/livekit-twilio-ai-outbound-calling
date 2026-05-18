@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Outbound Calling</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5/papaparse.min.js"></script>
+</head>
+<body class="min-h-screen bg-gray-950 text-gray-100">
+
+  <!-- ── Layout ───────────────────────────────────────────────────────────── -->
+  <div class="max-w-4xl mx-auto px-4 py-10 space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">AI Outbound Calling</h1>
+        <p class="text-sm text-gray-500 mt-0.5">LiveKit · Twilio · Deepgram · ElevenLabs</p>
+      </div>
+      <!-- Active voice pill -->
+      <div id="activeVoicePill" class="hidden items-center gap-2 bg-indigo-950 border border-indigo-800
+           rounded-full px-3 py-1 text-xs text-indigo-300">
+        <span class="w-2 h-2 rounded-full bg-indigo-400 inline-block"></span>
+        <span id="activeVoiceLabel">No voice</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-800 gap-1">
+      <button onclick="switchTab('voice')"  id="tab-btn-voice"
+        class="tab-btn px-4 py-2 text-sm font-medium border-b-2 transition-colors">
+        Voice Setup
+      </button>
+      <button onclick="switchTab('campaign')" id="tab-btn-campaign"
+        class="tab-btn px-4 py-2 text-sm font-medium border-b-2 transition-colors">
+        Campaign
+      </button>
+      <button onclick="switchTab('single')" id="tab-btn-single"
+        class="tab-btn px-4 py-2 text-sm font-medium border-b-2 transition-colors">
+        Single Call
+      </button>
+      <button onclick="switchTab('active')" id="tab-btn-active"
+        class="tab-btn px-4 py-2 text-sm font-medium border-b-2 transition-colors">
+        Active Calls
+      </button>
+    </div>
+
+    <!-- ── Tab: Voice Setup ──────────────────────────────────────────────── -->
+    <div id="tab-voice" class="space-y-6">
+
+      <!-- LiveKit Inference voice picker -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+        <div>
+          <h2 class="text-base font-medium">LiveKit Inference voices</h2>
+          <p class="text-xs text-gray-500 mt-0.5">
+            Routed through your LiveKit credentials — no separate provider API keys needed.
+          </p>
+        </div>
+
+        <!-- Provider filter tabs -->
+        <div class="flex gap-1 border-b border-gray-800">
+          <button onclick="filterProvider('all')" id="vf-all"
+            class="vf-btn px-3 py-1.5 text-xs font-medium border-b-2 transition-colors -mb-px">All</button>
+          <button onclick="filterProvider('Cartesia')" id="vf-Cartesia"
+            class="vf-btn px-3 py-1.5 text-xs font-medium border-b-2 transition-colors -mb-px">Cartesia</button>
+          <button onclick="filterProvider('Deepgram')" id="vf-Deepgram"
+            class="vf-btn px-3 py-1.5 text-xs font-medium border-b-2 transition-colors -mb-px">Deepgram</button>
+          <button onclick="filterProvider('Rime')" id="vf-Rime"
+            class="vf-btn px-3 py-1.5 text-xs font-medium border-b-2 transition-colors -mb-px">Rime</button>
+          <button onclick="filterProvider('ElevenLabs')" id="vf-ElevenLabs"
+            class="vf-btn px-3 py-1.5 text-xs font-medium border-b-2 transition-colors -mb-px">ElevenLabs</button>
+        </div>
+
+        <!-- Language filter tabs -->
+        <div class="flex gap-1 pt-1">
+          <span class="text-xs text-gray-600 self-center mr-1">Language:</span>
+          <button onclick="filterLanguage('all')" id="lf-all"
+            class="lf-btn px-2.5 py-1 text-xs font-medium rounded-md transition-colors">All</button>
+          <button onclick="filterLanguage('en')" id="lf-en"
+            class="lf-btn px-2.5 py-1 text-xs font-medium rounded-md transition-colors">English</button>
+          <button onclick="filterLanguage('es')" id="lf-es"
+            class="lf-btn px-2.5 py-1 text-xs font-medium rounded-md transition-colors">Spanish</button>
+        </div>
+
+        <!-- Voice list -->
+        <div id="voiceList" class="space-y-1 max-h-96 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Campaign ────────────────────────────────────────────────── -->
+    <div id="tab-campaign" class="space-y-6 hidden">
+
+      <!-- Config -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+        <h2 class="text-base font-medium">Campaign settings</h2>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Agent name</label>
+            <input id="campAgentName" type="text" value="AI Assistant"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Voice</label>
+            <select id="campVoiceSelect"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">Default voice</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Language</label>
+            <select id="campLanguageSelect"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">English (default)</option>
+              <option value="es">Spanish (Español)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">
+            Base instructions
+            <span class="text-gray-500 font-normal">(columns from your CSV can be referenced as context)</span>
+          </label>
+          <textarea id="campInstructions" rows="4"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                   placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+          >You are a friendly outreach assistant. Introduce yourself by name, ask how the person is doing, and briefly explain the reason for your call using the context provided. Keep it warm, natural, and under 2 minutes.</textarea>
+        </div>
+      </div>
+
+      <!-- CSV upload -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+        <h2 class="text-base font-medium">Contact list</h2>
+        <p class="text-sm text-gray-400">
+          CSV columns: <code class="bg-gray-800 px-1 rounded text-indigo-300">phone_number</code> (E.164, required),
+          <code class="bg-gray-800 px-1 rounded text-indigo-300">name</code> (optional — used in greeting),
+          and any other columns become personalization context (English or Spanish).
+        </p>
+
+        <!-- CSV Drop zone -->
+        <div id="csvDropZone"
+          class="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center cursor-pointer
+                 hover:border-indigo-600 transition-colors"
+          onclick="document.getElementById('csvInput').click()"
+        >
+          <p class="text-sm text-gray-400">
+            Drop CSV here, or <span class="text-indigo-400 underline">browse</span>
+          </p>
+          <p class="text-xs text-gray-600 mt-1" id="csvDropSub">No file selected</p>
+        </div>
+        <input id="csvInput" type="file" accept=".csv,text/csv" class="hidden"
+               onchange="onCSVSelected(this.files[0])" />
+
+        <!-- Preview table -->
+        <div id="csvPreview" class="hidden space-y-2">
+          <p class="text-sm text-gray-400" id="csvSummary"></p>
+          <div class="overflow-x-auto rounded-lg border border-gray-800">
+            <table class="w-full text-xs">
+              <thead id="csvThead" class="bg-gray-800 text-gray-400"></thead>
+              <tbody id="csvTbody" class="divide-y divide-gray-800"></tbody>
+            </table>
+          </div>
+          <p id="csvMore" class="text-xs text-gray-500 hidden"></p>
+        </div>
+      </div>
+
+      <!-- Launch -->
+      <div class="flex items-center gap-4">
+        <button id="launchBtn" onclick="launchCampaign()"
+          class="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500
+                 disabled:cursor-not-allowed transition-colors rounded-lg px-6 py-2.5 text-sm font-medium">
+          Launch Campaign
+        </button>
+        <span id="campLaunchStatus" class="text-sm text-gray-400"></span>
+      </div>
+
+      <!-- Campaign status -->
+      <div id="campStatus" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-medium">Campaign status</h2>
+          <div class="flex gap-3 text-xs">
+            <span class="text-gray-400">Pending: <span id="cnt-pending" class="text-white font-medium">0</span></span>
+            <span class="text-yellow-400">Dispatching: <span id="cnt-dispatching" class="font-medium">0</span></span>
+            <span class="text-green-400">Dispatched: <span id="cnt-dispatched" class="font-medium">0</span></span>
+            <span class="text-red-400">Error: <span id="cnt-error" class="font-medium">0</span></span>
+          </div>
+        </div>
+        <div class="overflow-x-auto rounded-lg border border-gray-800">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-800 text-gray-400">
+              <tr>
+                <th class="px-3 py-2 text-left">#</th>
+                <th class="px-3 py-2 text-left">Phone</th>
+                <th class="px-3 py-2 text-left">Name</th>
+                <th class="px-3 py-2 text-left">Context</th>
+                <th class="px-3 py-2 text-left">Status</th>
+                <th class="px-3 py-2 text-left">Room</th>
+              </tr>
+            </thead>
+            <tbody id="campTbody" class="divide-y divide-gray-800"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Single Call ──────────────────────────────────────────────── -->
+    <div id="tab-single" class="space-y-6 hidden">
+
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+        <h2 class="text-base font-medium">Place a call</h2>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">
+              Phone number <span class="text-gray-500">(E.164)</span>
+            </label>
+            <input id="singlePhone" type="tel" placeholder="+12125551234"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Contact name <span class="text-gray-500">(optional)</span></label>
+            <input id="singleContactName" type="text" placeholder="e.g. María García"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Agent name</label>
+            <input id="singleAgentName" type="text" value="AI Assistant"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Voice</label>
+            <select id="singleVoiceSelect"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">Default voice</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Language</label>
+            <select id="singleLanguageSelect"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">English (default)</option>
+              <option value="es">Spanish (Español)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">
+            Call context <span class="text-gray-500 font-normal">(optional — why are you calling this person?)</span>
+          </label>
+          <textarea id="singleContext" rows="2"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                   placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            placeholder="e.g. visited our online shop yesterday, abandoned cart with 3 items"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">Agent instructions</label>
+          <textarea id="singleInstructions" rows="4"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                   placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+          >You are a friendly assistant making a courtesy call. Introduce yourself, ask how the person is doing, and keep the conversation warm and brief.</textarea>
+        </div>
+
+        <button id="callBtn" onclick="initiateCall()"
+          class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500
+                 disabled:cursor-not-allowed transition-colors rounded-lg px-4 py-2.5 text-sm font-medium">
+          Call
+        </button>
+      </div>
+
+      <!-- Status + log -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium text-gray-300">Status</span>
+          <span id="singleStatusBadge"
+            class="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400">Idle</span>
+        </div>
+        <div id="singleLog" class="space-y-1 text-sm text-gray-400 min-h-[3rem]">
+          <p class="text-gray-600 italic">No calls yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Active Calls ───────────────────────────────────────────────── -->
+    <div id="tab-active" class="space-y-4 hidden">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-medium">Active Calls</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Live rooms on your LiveKit server</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="activeCallsAutoRefresh" class="text-xs text-gray-600"></span>
+            <button onclick="refreshActiveCalls()"
+              class="bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors
+                     rounded-lg px-4 py-1.5 text-sm font-medium">
+              Refresh
+            </button>
+          </div>
+        </div>
+        <div id="activeCallsList">
+          <p class="text-sm text-gray-500 italic">Click Refresh to load active calls.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+
+  <!-- ── Scripts ──────────────────────────────────────────────────────────── -->
+  <script>
+  // ── Constants ──────────────────────────────────────────────────────────────
+  const BACKEND = '';   // same origin; set to 'http://localhost:8000' for cross-origin dev
+
+  let activeCallsTimer = null;
+
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  function switchTab(name) {
+    ['voice','campaign','single','active'].forEach(t => {
+      document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
+      const btn = document.getElementById(`tab-btn-${t}`);
+      if (t === name) {
+        btn.classList.add('border-indigo-500','text-white');
+        btn.classList.remove('border-transparent','text-gray-400');
+      } else {
+        btn.classList.remove('border-indigo-500','text-white');
+        btn.classList.add('border-transparent','text-gray-400');
+      }
+    });
+    if (name === 'active') startActiveCallsPolling();
+    else stopActiveCallsPolling();
+  }
+  switchTab('voice');
+
+  // ── LiveKit Inference voice catalogue ─────────────────────────────────────
+  // voice_id = "provider/model:voice" passed directly to InferenceTTS.from_model_string()
+  // Voices without a ":voice" suffix use that model's built-in default voice.
+  const LIVEKIT_VOICES = [
+    // ── Cartesia (English) ────────────────────────────────────────────────
+    { id: "cartesia/sonic-2",                                        name: "Sonic-2 (default)",    provider: "Cartesia",    gender: "",       language: "en" },
+    { id: "cartesia/sonic-3",                                        name: "Sonic-3 (default)",    provider: "Cartesia",    gender: "",       language: "en" },
+    { id: "cartesia/sonic-2:79a125e8-cd45-4c13-8a67-188112f4dd22",  name: "British Lady",         provider: "Cartesia",    gender: "Female", language: "en" },
+    { id: "cartesia/sonic-2:a0e99841-438c-4a64-b679-ae501e7d6091",  name: "Barbershop Man",       provider: "Cartesia",    gender: "Male",   language: "en" },
+    { id: "cartesia/sonic-2:b7d50908-b17c-442d-ad8d-810c63997ed9",  name: "Doctor Meld",          provider: "Cartesia",    gender: "Male",   language: "en" },
+    { id: "cartesia/sonic-2:f9836c6e-a0bd-460e-9d3c-f7299fa60f94",  name: "Friendly Sidekick",    provider: "Cartesia",    gender: "Female", language: "en" },
+    { id: "cartesia/sonic-2:5c42302c-194b-4d0c-ba1a-8cb485c84ab9",  name: "Female Nurse",         provider: "Cartesia",    gender: "Female", language: "en" },
+    { id: "cartesia/sonic-2:694f9389-aac1-45b6-b726-9d9369183238",  name: "Newsman",              provider: "Cartesia",    gender: "Male",   language: "en" },
+    // ── Deepgram Aura-2 (English) ─────────────────────────────────────────
+    { id: "deepgram/aura-2:aura-2-asteria-en",                       name: "Asteria",              provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-luna-en",                          name: "Luna",                 provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-stella-en",                        name: "Stella",               provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-thalia-en",                        name: "Thalia",               provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-andromeda-en",                     name: "Andromeda",            provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-helena-en",                        name: "Helena",               provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-hera-en",                          name: "Hera",                 provider: "Deepgram",    gender: "Female", language: "en" },
+    { id: "deepgram/aura-2:aura-2-zeus-en",                          name: "Zeus",                 provider: "Deepgram",    gender: "Male",   language: "en" },
+    { id: "deepgram/aura-2:aura-2-odysseus-en",                      name: "Odysseus",             provider: "Deepgram",    gender: "Male",   language: "en" },
+    { id: "deepgram/aura-2:aura-2-orion-en",                         name: "Orion",                provider: "Deepgram",    gender: "Male",   language: "en" },
+    { id: "deepgram/aura-2:aura-2-apollo-en",                        name: "Apollo",               provider: "Deepgram",    gender: "Male",   language: "en" },
+    { id: "deepgram/aura-2:aura-2-arcas-en",                         name: "Arcas",                provider: "Deepgram",    gender: "Male",   language: "en" },
+    // ── Rime (English) ────────────────────────────────────────────────────
+    { id: "rime/mistv2:cove",                                         name: "Cove",                 provider: "Rime",        gender: "Male",   language: "en" },
+    { id: "rime/mistv2:marsh",                                        name: "Marsh",                provider: "Rime",        gender: "Male",   language: "en" },
+    { id: "rime/mistv2:bay",                                          name: "Bay",                  provider: "Rime",        gender: "Male",   language: "en" },
+    { id: "rime/mistv2:lagoon",                                       name: "Lagoon",               provider: "Rime",        gender: "Male",   language: "en" },
+    { id: "rime/mistv2:brook",                                        name: "Brook",                provider: "Rime",        gender: "Female", language: "en" },
+    { id: "rime/mistv2:aurora",                                       name: "Aurora",               provider: "Rime",        gender: "Female", language: "en" },
+    { id: "rime/mistv2:canyon",                                       name: "Canyon",               provider: "Rime",        gender: "Female", language: "en" },
+    // ── ElevenLabs Multilingual (Spanish / English) ───────────────────────
+    { id: "elevenlabs/eleven_multilingual_v2:21m00Tcm4TlvDq8ikWAM",  name: "Rachel",               provider: "ElevenLabs",  gender: "Female", language: "es" },
+    { id: "elevenlabs/eleven_multilingual_v2:pNInz6obpgDQGcFmaJgB",  name: "Adam",                 provider: "ElevenLabs",  gender: "Male",   language: "es" },
+    { id: "elevenlabs/eleven_multilingual_v2:ErXwobaYiN019PkySvjV",  name: "Antoni",               provider: "ElevenLabs",  gender: "Male",   language: "es" },
+    { id: "elevenlabs/eleven_multilingual_v2:AZnzlk1XvdvUeBnXmlld",  name: "Domi",                 provider: "ElevenLabs",  gender: "Female", language: "es" },
+    { id: "elevenlabs/eleven_multilingual_v2:MF3mGyEYCl7XYWbV9V6O",  name: "Elli",                 provider: "ElevenLabs",  gender: "Female", language: "es" },
+    { id: "elevenlabs/eleven_multilingual_v2:TxGEqnHWrfWFTfGW9XjX",  name: "Josh",                 provider: "ElevenLabs",  gender: "Male",   language: "es" },
+  ];
+
+  const PROVIDER_BADGE = {
+    Cartesia:   "bg-violet-900 text-violet-300",
+    Deepgram:   "bg-blue-900 text-blue-300",
+    Rime:       "bg-teal-900 text-teal-300",
+    ElevenLabs: "bg-orange-900 text-orange-300",
+  };
+
+  let currentVoiceFilter = 'all';
+  let currentLangFilter  = 'all';
+
+  function getActiveVoiceId() {
+    return localStorage.getItem('activeVoiceId') || '';
+  }
+  function setActiveVoiceId(id) {
+    localStorage.setItem('activeVoiceId', id);
+  }
+
+  function filterProvider(provider) {
+    currentVoiceFilter = provider;
+    ['all','Cartesia','Deepgram','Rime','ElevenLabs'].forEach(p => {
+      const btn = document.getElementById(`vf-${p}`);
+      if (!btn) return;
+      if (p === provider) {
+        btn.classList.add('border-indigo-500','text-white');
+        btn.classList.remove('border-transparent','text-gray-400');
+      } else {
+        btn.classList.remove('border-indigo-500','text-white');
+        btn.classList.add('border-transparent','text-gray-400');
+      }
+    });
+    renderVoices();
+  }
+
+  function filterLanguage(lang) {
+    currentLangFilter = lang;
+    ['all','en','es'].forEach(l => {
+      const btn = document.getElementById(`lf-${l}`);
+      if (!btn) return;
+      if (l === lang) {
+        btn.classList.add('bg-indigo-900','text-indigo-300');
+        btn.classList.remove('bg-gray-800','text-gray-400');
+      } else {
+        btn.classList.remove('bg-indigo-900','text-indigo-300');
+        btn.classList.add('bg-gray-800','text-gray-400');
+      }
+    });
+    renderVoices();
+  }
+
+  // Keep old name as alias for compatibility
+  function filterVoices(provider) { filterProvider(provider); }
+
+  function renderVoices() {
+    const activeId = getActiveVoiceId();
+    const list = document.getElementById('voiceList');
+
+    // Update header pill
+    const pill = document.getElementById('activeVoicePill');
+    const pillLabel = document.getElementById('activeVoiceLabel');
+    const active = LIVEKIT_VOICES.find(v => v.id === activeId);
+    if (active) {
+      pill.classList.remove('hidden'); pill.classList.add('flex');
+      pillLabel.textContent = `${active.provider} · ${active.name}`;
+    } else {
+      pill.classList.add('hidden'); pill.classList.remove('flex');
+    }
+
+    // Update dropdowns on Campaign + Single Call tabs
+    ['campVoiceSelect','singleVoiceSelect'].forEach(selId => {
+      const sel = document.getElementById(selId);
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">Default voice (Cartesia Sonic-2)</option>';
+      let lastProvider = '';
+      LIVEKIT_VOICES.forEach(v => {
+        if (v.provider !== lastProvider) {
+          const og = document.createElement('optgroup');
+          og.label = v.provider;
+          sel.appendChild(og);
+          lastProvider = v.provider;
+        }
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        const langTag = v.language === 'es' ? ' · ES' : '';
+        opt.textContent = `${v.name}${v.gender ? ' · ' + v.gender : ''}${langTag}`;
+        sel.appendChild(opt);
+      });
+      if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+      else if (activeId) sel.value = activeId;
+    });
+
+    // Apply provider + language filters
+    const filtered = LIVEKIT_VOICES.filter(v => {
+      const providerMatch = currentVoiceFilter === 'all' || v.provider === currentVoiceFilter;
+      const langMatch     = currentLangFilter  === 'all' || v.language === currentLangFilter;
+      return providerMatch && langMatch;
+    });
+
+    const LANG_BADGE = { en: 'bg-gray-800 text-gray-500', es: 'bg-green-900 text-green-300' };
+    const LANG_LABEL = { en: 'EN', es: 'ES' };
+
+    list.innerHTML = filtered.map(v => {
+      const isActive = v.id === activeId;
+      const badge = PROVIDER_BADGE[v.provider] ?? 'bg-gray-800 text-gray-400';
+      const langBadge = LANG_BADGE[v.language] ?? 'bg-gray-800 text-gray-500';
+      const langLabel = LANG_LABEL[v.language] ?? v.language?.toUpperCase();
+      return `
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg ${isActive ? 'bg-indigo-950/60' : 'hover:bg-gray-800/50'} gap-3">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-indigo-400' : 'bg-gray-700'}"></span>
+            <span class="text-sm ${isActive ? 'text-white font-medium' : 'text-gray-300'}">${escHtml(v.name)}</span>
+            <span class="text-xs px-1.5 py-0.5 rounded-full ${badge}">${escHtml(v.provider)}</span>
+            ${v.gender ? `<span class="text-xs text-gray-600">${v.gender}</span>` : ''}
+            ${langLabel ? `<span class="text-xs px-1.5 py-0.5 rounded-full ${langBadge}">${langLabel}</span>` : ''}
+          </div>
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <button onclick="previewVoice('${escHtml(v.id)}')"
+              title="${v.id === _previewLoading ? 'Loading…' : v.id === _previewVoiceId ? 'Stop preview' : 'Preview voice'}"
+              ${v.id === _previewLoading ? 'disabled' : ''}
+              class="w-7 h-7 flex items-center justify-center rounded-md transition-colors
+                ${v.id === _previewLoading  ? 'bg-gray-800 text-gray-500 cursor-wait'
+                : v.id === _previewVoiceId  ? 'bg-indigo-900 text-indigo-300'
+                                            : 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200'}">
+              ${v.id === _previewLoading
+                ? `<svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`
+                : v.id === _previewVoiceId
+                  ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><rect x="4" y="4" width="12" height="12" rx="1"/></svg>`
+                  : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.84Z"/></svg>`
+              }</button>
+            ${isActive
+              ? '<span class="text-xs px-2.5 py-1 bg-indigo-950 text-indigo-400 rounded-md">Active</span>'
+              : `<button onclick="activateVoice('${escHtml(v.id)}')"
+                  class="text-xs px-2.5 py-1 bg-indigo-900 hover:bg-indigo-800 text-indigo-300 rounded-md transition-colors">
+                  Use</button>`}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function activateVoice(id) {
+    setActiveVoiceId(id);
+    renderVoices();
+  }
+
+  let _previewAudio   = null;
+  let _previewVoiceId = null;   // voice currently playing
+  let _previewLoading = null;   // voice currently being fetched
+  const _previewCache = {};     // voiceId → blob URL (persists for the page session)
+
+  function _setPreviewIdle() {
+    if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
+    _previewVoiceId = null;
+    renderVoices();
+  }
+
+  function _playFromUrl(objectUrl, voiceId) {
+    _previewAudio = new Audio(objectUrl);
+    _previewAudio.onended = () => { _previewAudio = null; _previewVoiceId = null; renderVoices(); };
+    _previewAudio.onerror = () => { _previewAudio = null; _previewVoiceId = null; renderVoices(); };
+    _previewAudio.play();
+  }
+
+  async function previewVoice(voiceId) {
+    // Clicking stop on the currently playing voice → stop
+    if (_previewVoiceId === voiceId) {
+      _setPreviewIdle();
+      return;
+    }
+
+    // Stop whatever is playing now
+    if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
+    _previewVoiceId = null;
+
+    // Serve from cache — no network round-trip
+    if (_previewCache[voiceId]) {
+      _previewVoiceId = voiceId;
+      renderVoices();
+      _playFromUrl(_previewCache[voiceId], voiceId);
+      return;
+    }
+
+    // Show spinner while downloading
+    _previewLoading = voiceId;
+    renderVoices();
+
+    try {
+      const url = `${BACKEND}/voice-preview?voice_id=${encodeURIComponent(voiceId)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail ?? res.statusText);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      _previewCache[voiceId] = objectUrl;   // cache for subsequent plays
+
+      // User may have navigated away / stopped while we were fetching
+      if (_previewLoading !== voiceId) return;
+
+      _previewLoading = null;
+      _previewVoiceId = voiceId;
+      renderVoices();
+      _playFromUrl(objectUrl, voiceId);
+    } catch (e) {
+      alert(`Preview failed: ${e.message}`);
+      _previewLoading = null;
+      renderVoices();
+    }
+  }
+
+  // ── CSV parsing ────────────────────────────────────────────────────────────
+  let parsedContacts = [];
+
+  const csvDropZone = document.getElementById('csvDropZone');
+  csvDropZone.addEventListener('dragover', e => { e.preventDefault(); csvDropZone.classList.add('border-indigo-500'); });
+  csvDropZone.addEventListener('dragleave', () => csvDropZone.classList.remove('border-indigo-500'));
+  csvDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    csvDropZone.classList.remove('border-indigo-500');
+    if (e.dataTransfer.files[0]) onCSVSelected(e.dataTransfer.files[0]);
+  });
+
+  function onCSVSelected(file) {
+    if (!file) return;
+    document.getElementById('csvDropSub').textContent = file.name;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: 'UTF-8',
+      complete: result => {
+        const raw = result.data;
+        if (!raw.length) { alert('CSV appears to be empty.'); return; }
+
+        // Normalize headers (lowercase + trim)
+        const headers = result.meta.fields.map(h => h.trim().toLowerCase());
+        const phoneIdx = headers.indexOf('phone_number') !== -1 ? 'phone_number'
+          : headers.indexOf('phone') !== -1 ? 'phone' : null;
+
+        if (!phoneIdx) {
+          alert('CSV must have a "phone_number" (or "phone") column.');
+          return;
+        }
+
+        // Name column: accept name / contact_name / nombre / first_name / full_name
+        const NAME_COLS = ['name', 'contact_name', 'nombre', 'first_name', 'full_name'];
+        const nameIdx = NAME_COLS.find(k => headers.indexOf(k) !== -1) || null;
+
+        // Columns excluded from personalization_context
+        const SKIP_COLS = new Set([phoneIdx, ...(nameIdx ? [nameIdx] : []), '']);
+
+        // Build contacts
+        const errors = [];
+        parsedContacts = raw.map((row, i) => {
+          // Normalize row keys
+          const normRow = {};
+          Object.entries(row).forEach(([k, v]) => { normRow[k.trim().toLowerCase()] = v; });
+          const phone = (normRow[phoneIdx] || '').trim();
+          if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+            errors.push(`Row ${i + 2}: invalid phone "${phone}"`);
+          }
+          const contactName = nameIdx ? (normRow[nameIdx] || '').trim() : '';
+          // Build context string from remaining columns
+          const ctx = Object.entries(normRow)
+            .filter(([k]) => !SKIP_COLS.has(k))
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ');
+          return { phone_number: phone, contact_name: contactName, personalization_context: ctx };
+        });
+
+        if (errors.length) {
+          const msg = errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n…and ${errors.length - 5} more` : '');
+          alert(`Some rows have invalid phone numbers:\n\n${msg}\n\nThey will be skipped or fail during dispatch.`);
+        }
+
+        // Check duplicates
+        const phones = parsedContacts.map(c => c.phone_number);
+        const dupes = phones.filter((p, i) => phones.indexOf(p) !== i);
+        if (dupes.length) {
+          const uniq = [...new Set(dupes)];
+          alert(`Warning: ${uniq.length} duplicate phone number(s) found:\n${uniq.slice(0, 5).join('\n')}`);
+        }
+
+        renderCSVPreview(result.meta.fields, raw);
+      },
+      error: err => alert(`Failed to parse CSV: ${err.message}`),
+    });
+  }
+
+  function renderCSVPreview(originalHeaders, rawRows) {
+    const PREVIEW = 10;
+    const summary = document.getElementById('csvSummary');
+    const thead = document.getElementById('csvThead');
+    const tbody = document.getElementById('csvTbody');
+    const more = document.getElementById('csvMore');
+    const preview = document.getElementById('csvPreview');
+
+    summary.textContent = `${parsedContacts.length} contact(s) loaded.`;
+
+    // Header row
+    thead.innerHTML = `<tr>${originalHeaders.map(h =>
+      `<th class="px-3 py-2 text-left">${escHtml(h)}</th>`).join('')}</tr>`;
+
+    // Data rows (preview only)
+    tbody.innerHTML = rawRows.slice(0, PREVIEW).map(row =>
+      `<tr class="hover:bg-gray-800/50">${originalHeaders.map(h =>
+        `<td class="px-3 py-2 text-gray-300">${escHtml(String(row[h] ?? ''))}</td>`
+      ).join('')}</tr>`
+    ).join('');
+
+    if (rawRows.length > PREVIEW) {
+      more.textContent = `…and ${rawRows.length - PREVIEW} more rows`;
+      more.classList.remove('hidden');
+    } else {
+      more.classList.add('hidden');
+    }
+
+    preview.classList.remove('hidden');
+  }
+
+  // ── Campaign launch + polling ──────────────────────────────────────────────
+  let campPollHandle = null;
+
+  async function launchCampaign() {
+    const instructions = document.getElementById('campInstructions').value.trim();
+    const agentName    = document.getElementById('campAgentName').value.trim() || 'AI Assistant';
+    const voiceId      = document.getElementById('campVoiceSelect').value || null;
+    const language     = document.getElementById('campLanguageSelect').value || null;
+    const btn          = document.getElementById('launchBtn');
+    const statusEl     = document.getElementById('campLaunchStatus');
+
+    if (!parsedContacts.length) { statusEl.textContent = 'Upload a CSV first.'; return; }
+    if (!instructions)          { statusEl.textContent = 'Add base instructions.'; return; }
+    if (parsedContacts.length > 500) {
+      statusEl.textContent = 'Max 500 contacts per batch.'; return;
+    }
+
+    btn.disabled = true;
+    statusEl.textContent = 'Launching…';
+
+    try {
+      const res = await fetch(`${BACKEND}/campaign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base_instructions: instructions,
+          agent_name: agentName,
+          voice_id: voiceId,
+          language: language,
+          contacts: parsedContacts.map(c => ({
+            phone_number: c.phone_number,
+            contact_name: c.contact_name || '',
+            personalization_context: c.personalization_context || '',
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data));
+
+      statusEl.textContent = `Campaign ${data.campaign_id.slice(0, 8)}… — ${data.total} contacts dispatching`;
+      document.getElementById('campStatus').classList.remove('hidden');
+
+      // Start polling
+      clearInterval(campPollHandle);
+      campPollHandle = setInterval(() => pollCampaign(data.campaign_id), 3000);
+      pollCampaign(data.campaign_id); // immediate first poll
+    } catch (e) {
+      statusEl.textContent = `Error: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function pollCampaign(campaignId) {
+    try {
+      const res = await fetch(`${BACKEND}/campaign/${campaignId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      renderCampaignStatus(data);
+      if (data.counts.pending + data.counts.dispatching === 0) {
+        clearInterval(campPollHandle);
+        document.getElementById('campLaunchStatus').textContent =
+          `Done — ${data.counts.dispatched} dispatched, ${data.counts.error} errors`;
+      }
+    } catch { /* ignore poll errors */ }
+  }
+
+  function renderCampaignStatus(data) {
+    document.getElementById('cnt-pending').textContent    = data.counts.pending;
+    document.getElementById('cnt-dispatching').textContent = data.counts.dispatching;
+    document.getElementById('cnt-dispatched').textContent = data.counts.dispatched;
+    document.getElementById('cnt-error').textContent     = data.counts.error;
+
+    const STATUS_BADGE = {
+      pending:     'bg-gray-800 text-gray-400',
+      dispatching: 'bg-yellow-900 text-yellow-300',
+      dispatched:  'bg-green-900 text-green-300',
+      error:       'bg-red-900 text-red-300',
+    };
+
+    document.getElementById('campTbody').innerHTML = data.contacts.map((c, i) => `
+      <tr class="hover:bg-gray-800/50">
+        <td class="px-3 py-2 text-gray-500">${i + 1}</td>
+        <td class="px-3 py-2 font-mono text-gray-200">${escHtml(c.phone_number)}</td>
+        <td class="px-3 py-2 text-gray-300">${escHtml(c.contact_name || '—')}</td>
+        <td class="px-3 py-2 text-gray-400 max-w-xs truncate">${escHtml(c.personalization_context || '—')}</td>
+        <td class="px-3 py-2">
+          <span class="px-2 py-0.5 rounded-full text-xs ${STATUS_BADGE[c.status] ?? 'bg-gray-800 text-gray-400'}">
+            ${c.status}
+          </span>
+        </td>
+        <td class="px-3 py-2 font-mono text-gray-500 text-xs">${escHtml(c.room_name || '—')}</td>
+      </tr>`).join('');
+  }
+
+  // ── Single call ────────────────────────────────────────────────────────────
+  const SINGLE_STATUS_COLORS = {
+    idle:      'bg-gray-800 text-gray-400',
+    calling:   'bg-yellow-900 text-yellow-300',
+    connected: 'bg-green-900 text-green-300',
+    error:     'bg-red-900 text-red-300',
+  };
+
+  function setSingleStatus(label, type = 'idle') {
+    const badge = document.getElementById('singleStatusBadge');
+    badge.textContent = label;
+    badge.className = `text-xs px-2 py-0.5 rounded-full ${SINGLE_STATUS_COLORS[type] ?? SINGLE_STATUS_COLORS.idle}`;
+  }
+
+  function logSingle(msg, type = 'info') {
+    const logEl = document.getElementById('singleLog');
+    logEl.querySelector('.italic')?.remove();
+    const colors = { info: 'text-gray-300', success: 'text-green-400', error: 'text-red-400', muted: 'text-gray-500' };
+    const p = document.createElement('p');
+    p.className = colors[type] ?? colors.info;
+    p.textContent = `[${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})}] ${msg}`;
+    logEl.prepend(p);
+    while (logEl.children.length > 50) logEl.removeChild(logEl.lastChild);
+  }
+
+  async function initiateCall() {
+    const phone        = document.getElementById('singlePhone').value.trim();
+    const contactName  = document.getElementById('singleContactName').value.trim();
+    const agentName    = document.getElementById('singleAgentName').value.trim() || 'AI Assistant';
+    const instructions = document.getElementById('singleInstructions').value.trim();
+    const context      = document.getElementById('singleContext').value.trim();
+    const voiceId      = document.getElementById('singleVoiceSelect').value || null;
+    const language     = document.getElementById('singleLanguageSelect').value || null;
+    const btn          = document.getElementById('callBtn');
+
+    if (!phone) { logSingle('Enter a phone number.', 'error'); return; }
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      logSingle('Phone number must be E.164 format, e.g. +12125551234', 'error'); return;
+    }
+
+    btn.disabled = true;
+    setSingleStatus('Calling…', 'calling');
+    logSingle(`Dispatching call to ${phone}…`);
+
+    try {
+      const res = await fetch(`${BACKEND}/call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: phone, instructions, agent_name: agentName, voice_id: voiceId, language, contact_name: contactName, personalization_context: context }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data));
+
+      setSingleStatus('Connected', 'connected');
+      logSingle(`Agent dispatched — room: ${data.room_name}`, 'success');
+      logSingle(`The AI agent is now calling ${phone}.`, 'muted');
+    } catch (e) {
+      setSingleStatus('Error', 'error');
+      logSingle(`Error: ${e.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('singlePhone').addEventListener('keydown', e => {
+    if (e.key === 'Enter') initiateCall();
+  });
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Active Calls ───────────────────────────────────────────────────────────
+  function startActiveCallsPolling() {
+    clearInterval(activeCallsTimer);
+    refreshActiveCalls();
+    activeCallsTimer = setInterval(refreshActiveCalls, 10000);
+    document.getElementById('activeCallsAutoRefresh').textContent = 'auto-refreshing every 10s';
+  }
+
+  function stopActiveCallsPolling() {
+    clearInterval(activeCallsTimer);
+    activeCallsTimer = null;
+    document.getElementById('activeCallsAutoRefresh').textContent = '';
+  }
+
+  async function refreshActiveCalls() {
+    const list = document.getElementById('activeCallsList');
+    try {
+      const res = await fetch(`${BACKEND}/active-calls`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data));
+      renderActiveCalls(data.rooms);
+    } catch (e) {
+      list.innerHTML = `<p class="text-sm text-red-400">Failed to load: ${escHtml(e.message)}</p>`;
+    }
+  }
+
+  function renderActiveCalls(rooms) {
+    const list = document.getElementById('activeCallsList');
+    if (rooms.length === 0) {
+      list.innerHTML = '<p class="text-sm text-gray-500 italic">No active calls right now.</p>';
+      return;
+    }
+    list.innerHTML = rooms.map(r => {
+      const age = Math.floor((Date.now() / 1000) - r.created_at);
+      const ageStr = age < 60 ? `${age}s` : `${Math.floor(age / 60)}m ${age % 60}s`;
+      const isCamp = r.room_name.startsWith('camp-');
+      return `
+        <div class="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-800/50 mb-1.5">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-2 h-2 rounded-full bg-green-400 flex-shrink-0 animate-pulse"></span>
+              <span class="text-sm font-mono text-gray-200 truncate">${escHtml(r.room_name)}</span>
+              <span class="text-xs px-1.5 py-0.5 rounded-full ${isCamp ? 'bg-yellow-900 text-yellow-300' : 'bg-blue-900 text-blue-300'}">
+                ${isCamp ? 'campaign' : 'single'}
+              </span>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5 ml-4">
+              ${r.num_participants} participant${r.num_participants !== 1 ? 's' : ''} · running ${ageStr}
+            </p>
+          </div>
+          <button onclick="stopCall('${escHtml(r.room_name)}')"
+            class="flex-shrink-0 text-xs px-3 py-1.5 bg-red-950 hover:bg-red-900 border border-red-800
+                   text-red-300 rounded-md transition-colors ml-3">
+            Stop
+          </button>
+        </div>`;
+    }).join('');
+  }
+
+  async function stopCall(roomName) {
+    if (!confirm(`Stop call in room "${roomName}"? This will disconnect all participants.`)) return;
+    try {
+      const res = await fetch(`${BACKEND}/active-calls/${encodeURIComponent(roomName)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data));
+      await refreshActiveCalls();
+    } catch (e) {
+      alert(`Failed to stop call: ${e.message}`);
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  filterProvider('all');
+  filterLanguage('all');
+  renderVoices();
+  </script>
+
+</body>
+</html>
